@@ -50,7 +50,8 @@ type NbaStatsResponse = {
 type NbaStatsRow = Record<string, unknown>;
 
 const DEFAULT_SEASON = "2025-26";
-const DEFAULT_SEASON_TYPE = "Regular Season";
+const DEFAULT_BASELINE_SEASON_TYPE = "Regular Season";
+const DEFAULT_RECENT_SEASON_TYPES = ["Regular Season", "Playoffs"];
 
 function slugify(value: string, id: string) {
   const slug = value
@@ -136,11 +137,21 @@ function aggregateStats(logs: ExternalGameLog[]) {
 
 export class OfficialNbaStatsProvider implements NbaDataProvider {
   private readonly season: string;
-  private readonly seasonType: string;
+  private readonly baselineSeasonType: string;
+  private readonly recentSeasonTypes: string[];
 
-  constructor(params?: { season?: string; seasonType?: string }) {
+  constructor(params?: { season?: string; baselineSeasonType?: string; recentSeasonTypes?: string[] }) {
     this.season = params?.season ?? process.env.NBA_SEASON ?? DEFAULT_SEASON;
-    this.seasonType = params?.seasonType ?? process.env.NBA_SEASON_TYPE ?? DEFAULT_SEASON_TYPE;
+    this.baselineSeasonType =
+      params?.baselineSeasonType ?? process.env.NBA_SEASON_TYPE ?? DEFAULT_BASELINE_SEASON_TYPE;
+    this.recentSeasonTypes =
+      params?.recentSeasonTypes ??
+      process.env.NBA_RECENT_SEASON_TYPES?.split(",").map((seasonType) => seasonType.trim()).filter(Boolean) ??
+      DEFAULT_RECENT_SEASON_TYPES;
+  }
+
+  getSourceSeasonTypeLabel() {
+    return `${this.baselineSeasonType} baseline / ${this.recentSeasonTypes.join(" + ")} recent`;
   }
 
   private async fetchEndpoint(endpoint: string, params: Record<string, string>) {
@@ -209,11 +220,11 @@ export class OfficialNbaStatsProvider implements NbaDataProvider {
   }
 
   async getRecentGameLogs(externalPlayerId: string): Promise<ExternalGameLog[]> {
-    const logs = await this.getLeagueGameLogs();
+    const logs = await this.getCombinedRecentGameLogs();
     return logs.filter((log) => log.externalPlayerId === externalPlayerId).slice(0, 10);
   }
 
-  async getLeagueGameLogs(): Promise<ExternalGameLog[]> {
+  async getLeagueGameLogs(seasonType = this.baselineSeasonType): Promise<ExternalGameLog[]> {
     const rows = await this.fetchEndpoint("leaguegamelog", {
       Counter: "0",
       DateFrom: "",
@@ -222,7 +233,7 @@ export class OfficialNbaStatsProvider implements NbaDataProvider {
       LeagueID: "00",
       PlayerOrTeam: "P",
       Season: this.season,
-      SeasonType: this.seasonType,
+      SeasonType: seasonType,
       Sorter: "DATE",
     });
 
@@ -251,19 +262,42 @@ export class OfficialNbaStatsProvider implements NbaDataProvider {
       .sort((a, b) => b.gameDate.localeCompare(a.gameDate));
   }
 
+  async getCombinedRecentGameLogs(): Promise<ExternalGameLog[]> {
+    const logSets = await Promise.all(
+      this.recentSeasonTypes.map((seasonType) => this.getLeagueGameLogs(seasonType)),
+    );
+    const logsByPlayerGame = new Map<string, ExternalGameLog>();
+
+    logSets.flat().forEach((log) => {
+      logsByPlayerGame.set(`${log.externalPlayerId}-${log.gameId}`, log);
+    });
+
+    return Array.from(logsByPlayerGame.values()).sort((a, b) =>
+      b.gameDate.localeCompare(a.gameDate),
+    );
+  }
+
   async getMarketPlayers(): Promise<IngestedPlayerMarket[]> {
-    const [activePlayers, gameLogs] = await Promise.all([
+    const [activePlayers, baselineGameLogs, recentGameLogs] = await Promise.all([
       this.getActivePlayers(),
       this.getLeagueGameLogs(),
+      this.getCombinedRecentGameLogs(),
     ]);
 
     const activePlayerMap = new Map(activePlayers.map((player) => [player.externalId, player]));
     const logsByPlayer = new Map<string, ExternalGameLog[]>();
+    const baselineLogsByPlayer = new Map<string, ExternalGameLog[]>();
 
-    gameLogs.forEach((log) => {
+    recentGameLogs.forEach((log) => {
       const logs = logsByPlayer.get(log.externalPlayerId) ?? [];
       logs.push(log);
       logsByPlayer.set(log.externalPlayerId, logs);
+    });
+
+    baselineGameLogs.forEach((log) => {
+      const logs = baselineLogsByPlayer.get(log.externalPlayerId) ?? [];
+      logs.push(log);
+      baselineLogsByPlayer.set(log.externalPlayerId, logs);
     });
 
     return Array.from(logsByPlayer.entries())
@@ -284,7 +318,8 @@ export class OfficialNbaStatsProvider implements NbaDataProvider {
           } satisfies NbaActivePlayer);
 
         const last10Games = logs.slice(0, 10);
-        const seasonStats = aggregateStats(logs);
+        const baselineLogs = baselineLogsByPlayer.get(externalId) ?? logs;
+        const seasonStats = aggregateStats(baselineLogs);
         const last10Stats = aggregateStats(last10Games);
         const teamLast10WinPct = last10Games.length
           ? last10Games.filter((game) => game.teamWon).length / last10Games.length

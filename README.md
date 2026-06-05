@@ -45,6 +45,7 @@ OPENAI_API_KEY="sk-proj-your-openai-key"
 CRON_SECRET="replace-with-a-long-random-secret"
 NBA_SEASON="2025-26"
 NBA_SEASON_TYPE="Regular Season"
+NBA_RECENT_SEASON_TYPES="Regular Season,Playoffs"
 ENABLE_AI_REPORTS="false"
 MAX_AI_REPORTS_PER_REFRESH="10"
 ```
@@ -79,9 +80,10 @@ The UI reads from Postgres when `DATABASE_URL` is configured and real market sna
 `vercel.json` schedules `/api/cron/daily-refresh` once per day. The route:
 
 1. Fetches active players from `stats.nba.com/stats/playerindex`.
-2. Fetches player game logs from `stats.nba.com/stats/leaguegamelog`.
-3. Persists players, full season game logs, daily market snapshots, and stock scores with Prisma.
-4. Creates report text from the real stat deltas, or uses OpenAI when `ENABLE_AI_REPORTS="true"`.
+2. Fetches regular-season game logs for the season-average baseline.
+3. Fetches regular-season plus playoff game logs for true most-recent games and last-10 stock movement.
+4. Persists players, combined game logs, daily market snapshots, and stock scores with Prisma.
+5. Creates report text from the real stat deltas, or uses OpenAI when `ENABLE_AI_REPORTS="true"`.
 
 Trigger a local refresh after `npm run dev` is running:
 

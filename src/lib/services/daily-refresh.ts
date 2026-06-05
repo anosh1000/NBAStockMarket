@@ -103,6 +103,8 @@ export async function runDailyMarketRefresh(): Promise<DailyRefreshResult> {
   const provider = new OfficialNbaStatsProvider();
   const marketPlayers = await provider.getMarketPlayers();
   const refreshDate = startOfUtcDay();
+  const sourceSeason = process.env.NBA_SEASON ?? "2025-26";
+  const sourceSeasonType = provider.getSourceSeasonTypeLabel();
   const enableAiReports = process.env.ENABLE_AI_REPORTS === "true";
   const maxAiReports = Number(process.env.MAX_AI_REPORTS_PER_REFRESH ?? 10);
   let gameLogsWritten = 0;
@@ -165,8 +167,8 @@ export async function runDailyMarketRefresh(): Promise<DailyRefreshResult> {
         last10TsPct: player.last10Stats.tsPct,
         teamLast10WinPct: player.teamLast10WinPct,
         gamesPlayed: player.gamesPlayed,
-        sourceSeason: process.env.NBA_SEASON ?? "2025-26",
-        sourceSeasonType: process.env.NBA_SEASON_TYPE ?? "Regular Season",
+        sourceSeason,
+        sourceSeasonType,
       },
       create: {
         playerId: dbPlayer.id,
@@ -181,8 +183,8 @@ export async function runDailyMarketRefresh(): Promise<DailyRefreshResult> {
         last10TsPct: player.last10Stats.tsPct,
         teamLast10WinPct: player.teamLast10WinPct,
         gamesPlayed: player.gamesPlayed,
-        sourceSeason: process.env.NBA_SEASON ?? "2025-26",
-        sourceSeasonType: process.env.NBA_SEASON_TYPE ?? "Regular Season",
+        sourceSeason,
+        sourceSeasonType,
       },
     });
 

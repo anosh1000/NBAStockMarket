@@ -7,6 +7,8 @@ export type GeneratedScoutReport = {
   stockScoreAtGeneration: number;
 };
 
+let openAiDisabledForProcess = false;
+
 export function shouldRegenerateReport(params: {
   lastGeneratedAt?: Date;
   previousScore?: number;
@@ -45,30 +47,40 @@ Return sections:
 `.trim();
 }
 
-export async function generateScoutReport(player: PlayerMarket): Promise<GeneratedScoutReport> {
-  if (!process.env.OPENAI_API_KEY) {
-    return {
-      report: [
-        player.report.summary,
-        player.report.movement,
-        `Strengths: ${player.report.strengths.join("; ")}`,
-        `Concerns: ${player.report.concerns.join("; ")}`,
-        `Outlook: ${player.report.outlook}`,
-      ].join("\n\n"),
-      generatedAt: new Date(),
-      stockScoreAtGeneration: player.stock.score,
-    };
-  }
-
-  const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-  const response = await openai.responses.create({
-    model: "gpt-4.1-mini",
-    input: buildScoutReportPrompt(player),
-  });
-
+function buildFallbackReport(player: PlayerMarket): GeneratedScoutReport {
   return {
-    report: response.output_text,
+    report: [
+      player.report.summary,
+      player.report.movement,
+      `Strengths: ${player.report.strengths.join("; ")}`,
+      `Concerns: ${player.report.concerns.join("; ")}`,
+      `Outlook: ${player.report.outlook}`,
+    ].join("\n\n"),
     generatedAt: new Date(),
     stockScoreAtGeneration: player.stock.score,
   };
+}
+
+export async function generateScoutReport(player: PlayerMarket): Promise<GeneratedScoutReport> {
+  if (!process.env.OPENAI_API_KEY || openAiDisabledForProcess) {
+    return buildFallbackReport(player);
+  }
+
+  try {
+    const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+    const response = await openai.responses.create({
+      model: "gpt-4.1-mini",
+      input: buildScoutReportPrompt(player),
+    });
+
+    return {
+      report: response.output_text,
+      generatedAt: new Date(),
+      stockScoreAtGeneration: player.stock.score,
+    };
+  } catch (error) {
+    openAiDisabledForProcess = true;
+    console.warn(`OpenAI report generation failed for ${player.name}. Using fallback report.`, error);
+    return buildFallbackReport(player);
+  }
 }
