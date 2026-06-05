@@ -1,0 +1,94 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Player {
+  id               String        @id @default(cuid())
+  externalId       String        @unique
+  slug             String        @unique
+  name             String
+  team             String
+  teamAbbreviation String
+  position         String
+  imageUrl         String
+  views            Int           @default(0)
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+  stats            PlayerStats[]
+  stockScores      StockScore[]
+  scoutReports     ScoutReport[]
+  marketSnapshots  MarketSnapshot[]
+
+  @@index([teamAbbreviation])
+  @@index([name])
+}
+
+model PlayerStats {
+  id        String   @id @default(cuid())
+  playerId  String
+  gameId    String
+  gameDate  DateTime
+  opponent  String
+  teamWon   Boolean
+  points    Int
+  rebounds  Int
+  assists   Int
+  tsPct     Float
+  player    Player   @relation(fields: [playerId], references: [id], onDelete: Cascade)
+
+  @@unique([playerId, gameId])
+  @@index([gameDate])
+}
+
+model MarketSnapshot {
+  id               String   @id @default(cuid())
+  playerId         String
+  date             DateTime
+  seasonPpg        Float
+  seasonRpg        Float
+  seasonApg        Float
+  seasonTsPct      Float
+  last10Ppg        Float
+  last10Rpg        Float
+  last10Apg        Float
+  last10TsPct      Float
+  teamLast10WinPct Float
+  gamesPlayed      Int
+  sourceSeason     String
+  sourceSeasonType String
+  player           Player   @relation(fields: [playerId], references: [id], onDelete: Cascade)
+
+  @@unique([playerId, date])
+  @@index([date])
+}
+
+model StockScore {
+  id              String   @id @default(cuid())
+  playerId        String
+  date            DateTime
+  score           Float
+  scoringTrend    Float
+  efficiencyTrend Float
+  playmakingTrend Float
+  teamSuccess     Float
+  player          Player   @relation(fields: [playerId], references: [id], onDelete: Cascade)
+
+  @@unique([playerId, date])
+  @@index([score])
+  @@index([date])
+}
+
+model ScoutReport {
+  id                     String   @id @default(cuid())
+  playerId               String
+  report                 String
+  generatedAt            DateTime @default(now())
+  stockScoreAtGeneration Float
+  player                 Player   @relation(fields: [playerId], references: [id], onDelete: Cascade)
+
+  @@index([generatedAt])
+}
