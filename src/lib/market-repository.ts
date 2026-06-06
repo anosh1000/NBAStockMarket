@@ -250,12 +250,14 @@ function toPlayerMarket(player: DbMarketPlayer): PlayerMarket | null {
       rpg: snapshot.seasonRpg,
       apg: snapshot.seasonApg,
       tsPct: snapshot.seasonTsPct,
+      mpg: snapshot.seasonMpg,
     },
     last10Stats: {
       ppg: snapshot.last10Ppg,
       rpg: snapshot.last10Rpg,
       apg: snapshot.last10Apg,
       tsPct: snapshot.last10TsPct,
+      mpg: snapshot.last10Mpg,
     },
     teamLast10WinPct: snapshot.teamLast10WinPct,
     stock: {
@@ -263,7 +265,20 @@ function toPlayerMarket(player: DbMarketPlayer): PlayerMarket | null {
       scoringTrend: latestScore.scoringTrend,
       efficiencyTrend: latestScore.efficiencyTrend,
       playmakingTrend: latestScore.playmakingTrend,
+      roleTrend: snapshot.last10Mpg && snapshot.seasonMpg
+        ? Math.round(((snapshot.last10Mpg - snapshot.seasonMpg) / snapshot.seasonMpg) * 250 * 10) / 10
+        : 0,
       teamSuccess: latestScore.teamSuccess,
+      qualityScore: snapshot.qualityScore,
+      trendScore: snapshot.trendScore,
+      productionScore: snapshot.productionScore,
+      roleScore: snapshot.roleScore,
+      efficiencyScore: Math.round((50 + (snapshot.seasonTsPct - 0.56) * 250) * 10) / 10,
+      availabilityScore: snapshot.availabilityScore,
+      consistencyScore: snapshot.consistencyScore,
+      seasonsExperience: snapshot.seasonsExperience,
+      mainBoardEligible: snapshot.mainBoardEligible,
+      breakoutEligible: snapshot.breakoutEligible,
     },
     stockHistory: [...player.stockScores]
       .reverse()
@@ -327,26 +342,34 @@ export async function getMarketPlayer(playerId: string) {
 }
 
 export function buildMarketCollections(players: PlayerMarket[]) {
-  const topRisers = [...players]
+  const eligiblePlayers = players.filter((player) => player.stock.mainBoardEligible);
+  const mainBoardPlayers = eligiblePlayers.length ? eligiblePlayers : players;
+  const breakoutWatch = players
+    .filter((player) => player.stock.breakoutEligible)
+    .sort((a, b) => b.stock.trendScore - a.stock.trendScore)
+    .slice(0, 6);
+  const topRisers = [...mainBoardPlayers]
     .sort((a, b) => b.stock.score - a.stock.score)
     .slice(0, 10);
-  const topFallers = [...players]
+  const topFallers = [...mainBoardPlayers]
     .sort((a, b) => a.stock.score - b.stock.score)
     .slice(0, 10);
   const trendingPlayers = [...players]
     .sort((a, b) => b.views - a.views)
     .slice(0, 6);
   const averageScore = players.length
-    ? Math.round((players.reduce((sum, player) => sum + player.stock.score, 0) / players.length) * 10) /
+    ? Math.round((mainBoardPlayers.reduce((sum, player) => sum + player.stock.score, 0) / mainBoardPlayers.length) * 10) /
       10
     : 0;
 
   return {
     topRisers,
     topFallers,
+    breakoutWatch,
     trendingPlayers,
     marketSummary: {
-      playerCount: players.length,
+      playerCount: mainBoardPlayers.length,
+      totalPlayerCount: players.length,
       averageScore,
       strongestRiser: topRisers[0],
       steepestFaller: topFallers[0],

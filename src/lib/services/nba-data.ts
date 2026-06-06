@@ -9,6 +9,7 @@ export type ExternalGameLog = {
   points: number;
   rebounds: number;
   assists: number;
+  minutes: number;
   tsPct: number;
   fieldGoalAttempts: number;
   freeThrowAttempts: number;
@@ -22,6 +23,8 @@ export type NbaActivePlayer = {
   teamAbbreviation: string;
   position: string;
   imageUrl: string;
+  draftYear?: number;
+  seasonsExperience?: number;
 };
 
 export type IngestedPlayerMarket = NbaActivePlayer & {
@@ -29,6 +32,7 @@ export type IngestedPlayerMarket = NbaActivePlayer & {
   last10Stats: StockMetricSnapshot & { rpg: number };
   teamLast10WinPct: number;
   gamesPlayed: number;
+  seasonsExperience: number;
   stock: ReturnType<typeof calculateStockScore>;
   allGames: ExternalGameLog[];
   last10Games: ExternalGameLog[];
@@ -53,6 +57,11 @@ const DEFAULT_SEASON = "2025-26";
 const DEFAULT_BASELINE_SEASON_TYPE = "Regular Season";
 const DEFAULT_RECENT_SEASON_TYPES = ["Regular Season", "Playoffs"];
 
+function seasonStartYear(season: string) {
+  const value = Number(season.split("-")[0]);
+  return Number.isFinite(value) ? value : new Date().getFullYear();
+}
+
 function slugify(value: string, id: string) {
   const slug = value
     .toLowerCase()
@@ -72,6 +81,17 @@ function getString(row: NbaStatsRow, key: string, fallback = "") {
 function getNumber(row: NbaStatsRow, key: string) {
   const value = Number(row[key]);
   return Number.isFinite(value) ? value : 0;
+}
+
+function getMinutes(row: NbaStatsRow) {
+  const value = row.MIN;
+
+  if (typeof value === "string" && value.includes(":")) {
+    const [minutes, seconds] = value.split(":").map(Number);
+    return (Number.isFinite(minutes) ? minutes : 0) + (Number.isFinite(seconds) ? seconds / 60 : 0);
+  }
+
+  return getNumber(row, "MIN");
 }
 
 function rowsToObjects(response: NbaStatsResponse) {
@@ -131,6 +151,7 @@ function aggregateStats(logs: ExternalGameLog[]) {
     ppg: round(average(logs.map((game) => game.points))),
     rpg: round(average(logs.map((game) => game.rebounds))),
     apg: round(average(logs.map((game) => game.assists))),
+    mpg: round(average(logs.map((game) => game.minutes))),
     tsPct: shootingDenominator > 0 ? Math.round((points / shootingDenominator) * 1000) / 1000 : 0,
   };
 }
@@ -206,6 +227,8 @@ export class OfficialNbaStatsProvider implements NbaDataProvider {
       const firstName = getString(row, "PLAYER_FIRST_NAME");
       const lastName = getString(row, "PLAYER_LAST_NAME");
       const name = getString(row, "PLAYER_NAME", `${firstName} ${lastName}`.trim());
+      const draftYear = getNumber(row, "DRAFT_YEAR");
+      const seasonsExperience = draftYear > 0 ? Math.max(0, seasonStartYear(this.season) - draftYear) : 0;
 
       return {
         externalId,
@@ -215,6 +238,8 @@ export class OfficialNbaStatsProvider implements NbaDataProvider {
         teamAbbreviation: getString(row, "TEAM_ABBREVIATION"),
         position: getString(row, "POSITION", "NBA"),
         imageUrl: `https://cdn.nba.com/headshots/nba/latest/1040x760/${externalId}.png`,
+        draftYear: draftYear || undefined,
+        seasonsExperience,
       };
     });
   }
@@ -253,6 +278,7 @@ export class OfficialNbaStatsProvider implements NbaDataProvider {
           points,
           rebounds: getNumber(row, "REB"),
           assists: getNumber(row, "AST"),
+          minutes: getMinutes(row),
           tsPct: denominator > 0 ? Math.round((points / denominator) * 1000) / 1000 : 0,
           fieldGoalAttempts,
           freeThrowAttempts,
@@ -315,6 +341,7 @@ export class OfficialNbaStatsProvider implements NbaDataProvider {
             teamAbbreviation: "NBA",
             position: "NBA",
             imageUrl: `https://cdn.nba.com/headshots/nba/latest/1040x760/${externalId}.png`,
+            seasonsExperience: 0,
           } satisfies NbaActivePlayer);
 
         const last10Games = logs.slice(0, 10);
@@ -328,6 +355,9 @@ export class OfficialNbaStatsProvider implements NbaDataProvider {
           season: seasonStats,
           last10: last10Stats,
           teamLast10WinPct,
+          gamesPlayed: baselineLogs.length,
+          recentGamesPlayed: last10Games.length,
+          seasonsExperience: player.seasonsExperience,
         });
 
         return {
@@ -335,7 +365,8 @@ export class OfficialNbaStatsProvider implements NbaDataProvider {
           seasonStats,
           last10Stats,
           teamLast10WinPct,
-          gamesPlayed: logs.length,
+          gamesPlayed: baselineLogs.length,
+          seasonsExperience: player.seasonsExperience ?? 0,
           stock,
           allGames: logs,
           last10Games,

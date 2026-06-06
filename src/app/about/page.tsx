@@ -10,24 +10,19 @@ export const metadata: Metadata = {
 
 const weights = [
   {
-    label: "Scoring Trend",
-    weight: "40%",
-    description: "Compares last 10 games PPG against season average PPG.",
+    label: "Current Quality",
+    weight: "65%",
+    description: "Blends production, role, efficiency, availability, and consistency.",
   },
   {
-    label: "Efficiency Trend",
+    label: "Recent Trend",
     weight: "25%",
-    description: "Compares last 10 games true shooting percentage against season average TS%.",
+    description: "Compares last 10 games against season baseline across scoring, efficiency, playmaking, and role.",
   },
   {
-    label: "Playmaking Trend",
-    weight: "20%",
-    description: "Compares last 10 games APG against season average APG.",
-  },
-  {
-    label: "Team Success",
-    weight: "15%",
-    description: "Uses recent team win percentage over the last 10 games.",
+    label: "Team Context",
+    weight: "10%",
+    description: "Uses recent team win percentage so strong play on winning teams gets a modest lift.",
   },
 ];
 
@@ -39,12 +34,12 @@ export default function AboutPage() {
           Methodology
         </p>
         <h1 className="text-4xl font-semibold tracking-[-0.04em] md:text-5xl">
-          A market model for NBA momentum
+          A quality-adjusted market model
         </h1>
         <p className="text-lg leading-8 text-muted-foreground">
-          NBA Stock Market translates short-term player performance into a normalized score between
-          -100 and +100. Positive scores indicate a rising stock, while negative scores indicate a
-          player is underperforming against his season baseline.
+          NBA Stock Market now prioritizes established stars and real rotation players. The score
+          still tracks recent movement, but players must have meaningful role, production, and
+          availability to dominate the main leaderboards.
         </p>
       </section>
 
@@ -66,17 +61,17 @@ export default function AboutPage() {
         <ExplainerCard
           icon={<LineChart className="h-5 w-5" />}
           title="Stock Score"
-          description="Each metric is normalized, clamped between -100 and +100, then blended using the model weights. This keeps different stat categories comparable."
+          description="The final score is 65% current quality, 25% recent trend, and 10% team context. This prevents tiny-sample players from outranking proven high-impact players."
         />
         <ExplainerCard
           icon={<Sparkles className="h-5 w-5" />}
-          title="AI Reports"
-          description="The first version uses realistic seeded reports. The service layer is ready for OpenAI generation once live stats and scheduled refreshes are enabled."
+          title="Leaderboard Eligibility"
+          description="Main boards require enough games, minutes, production, and quality. Hot low-minute players move to Breakout Watch until their role stabilizes."
         />
         <ExplainerCard
           icon={<Database className="h-5 w-5" />}
           title="Data Sources"
-          description="The project is structured for a free public NBA data provider and PostgreSQL persistence through Prisma, with Neon or Vercel Postgres as the recommended deployment target."
+          description="The app stores NBA Stats game logs in Postgres, uses regular season as the quality baseline, and includes playoffs for recent game tracking."
         />
       </section>
 
@@ -94,7 +89,7 @@ export default function AboutPage() {
         </CardHeader>
         <CardContent className="grid gap-4 md:grid-cols-3">
           <Step number="01" title="Ingest Stats" body="Fetch active players and game logs from the free NBA data provider." />
-          <Step number="02" title="Calculate Scores" body="Persist game logs, calculate stock scores, and store daily score snapshots." />
+          <Step number="02" title="Calculate Scores" body="Persist logs, calculate quality and trend scores, and separate main-board players from Breakout Watch." />
           <Step number="03" title="Generate Reports" body="Regenerate OpenAI reports once daily or after significant score movement." />
         </CardContent>
       </Card>

@@ -37,6 +37,7 @@ model PlayerStats {
   points    Int
   rebounds  Int
   assists   Int
+  minutes   Float   @default(0)
   tsPct     Float
   player    Player   @relation(fields: [playerId], references: [id], onDelete: Cascade)
 
@@ -52,12 +53,24 @@ model MarketSnapshot {
   seasonRpg        Float
   seasonApg        Float
   seasonTsPct      Float
+  seasonMpg        Float   @default(0)
   last10Ppg        Float
   last10Rpg        Float
   last10Apg        Float
   last10TsPct      Float
+  last10Mpg        Float   @default(0)
   teamLast10WinPct Float
   gamesPlayed      Int
+  recentGamesPlayed Int    @default(0)
+  seasonsExperience Int    @default(0)
+  qualityScore     Float   @default(0)
+  trendScore       Float   @default(0)
+  productionScore  Float   @default(0)
+  roleScore        Float   @default(0)
+  availabilityScore Float  @default(0)
+  consistencyScore Float   @default(0)
+  mainBoardEligible Boolean @default(false)
+  breakoutEligible Boolean @default(false)
   sourceSeason     String
   sourceSeasonType String
   player           Player   @relation(fields: [playerId], references: [id], onDelete: Cascade)

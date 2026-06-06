@@ -13,9 +13,8 @@ export const dynamic = "force-dynamic";
 
 export default async function HomePage() {
   const dataset = await getMarketDataset();
-  const { marketSummary, topFallers, topRisers, trendingPlayers } = buildMarketCollections(
-    dataset.players,
-  );
+  const { breakoutWatch, marketSummary, topFallers, topRisers, trendingPlayers } =
+    buildMarketCollections(dataset.players);
   const dataSourceLabel =
     dataset.source === "database" ? "Live NBA stats database" : "Seeded fallback data";
 
@@ -33,8 +32,8 @@ export default async function HomePage() {
                 NBA Stock Market
               </h1>
               <p className="max-w-2xl text-lg leading-8 text-muted-foreground">
-                Rank NBA players by performance momentum with a stock score that blends scoring,
-                efficiency, playmaking, and recent team success.
+                Rank established NBA players with a quality-adjusted stock score that blends
+                current production, role, efficiency, availability, recent trend, and team context.
               </p>
             </div>
             <div className="flex flex-col gap-3 sm:flex-row">
@@ -65,8 +64,8 @@ export default async function HomePage() {
           <CardContent className="grid h-full gap-4 p-6">
             <MarketStat
               icon={<LineChart className="h-5 w-5" />}
-              label="Coverage Universe"
-              value={`${marketSummary.playerCount} players`}
+              label="Main Board Universe"
+              value={`${marketSummary.playerCount} of ${marketSummary.totalPlayerCount} players`}
             />
             <MarketStat
               icon={<TrendingUp className="h-5 w-5" />}
@@ -105,15 +104,35 @@ export default async function HomePage() {
       <section id="leaderboards" className="scroll-mt-24 grid gap-6 lg:grid-cols-2">
         <StockLeaderboard
           title="Top Risers"
-          description="Players with the strongest recent upward momentum."
+          description="Established stars and rotation players with the best quality-adjusted stock."
           players={topRisers}
         />
         <StockLeaderboard
           title="Top Fallers"
-          description="Players whose recent performance is under season baseline."
+          description="Eligible players whose quality, role, or recent trend has weakened."
           players={topFallers}
         />
       </section>
+
+      {breakoutWatch.length > 0 ? (
+        <section className="space-y-4">
+          <div>
+            <p className="font-mono text-xs uppercase tracking-[0.22em] text-primary">
+              Small Sample Monitor
+            </p>
+            <h2 className="mt-2 text-2xl font-semibold tracking-tight">Breakout Watch</h2>
+            <p className="mt-2 max-w-2xl text-muted-foreground">
+              Young or low-minute players with strong recent trend signals. They are tracked here
+              until their role and season-long quality are strong enough for the main boards.
+            </p>
+          </div>
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            {breakoutWatch.map((player) => (
+              <PlayerCard key={player.id} player={player} />
+            ))}
+          </div>
+        </section>
+      ) : null}
 
       <section className="grid gap-6 lg:grid-cols-[0.9fr_1.1fr]">
         <div className="space-y-3">
@@ -123,7 +142,8 @@ export default async function HomePage() {
           <h2 className="text-2xl font-semibold tracking-tight">Find any player</h2>
           <p className="text-muted-foreground">
             Search the market by player, team, abbreviation, or position. When Postgres is
-            configured, this data comes from the real NBA stats ingestion pipeline.
+            configured, this data comes from the real NBA stats ingestion pipeline, including
+            quality and eligibility signals.
           </p>
         </div>
         <PlayerSearch players={dataset.players} />

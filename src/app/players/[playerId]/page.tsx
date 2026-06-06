@@ -87,13 +87,13 @@ export default async function PlayerPage({ params }: PlayerPageProps) {
             <CardHeader>
               <CardTitle>Current Stock Score</CardTitle>
               <CardDescription>
-                Weighted blend of scoring, efficiency, playmaking, and team success.
+                Quality-heavy score: 65% current quality, 25% recent trend, 10% context.
               </CardDescription>
             </CardHeader>
             <CardContent className="grid gap-4 sm:grid-cols-2">
-              <ScoreComponent label="Scoring Trend" value={player.stock.scoringTrend} />
-              <ScoreComponent label="Efficiency Trend" value={player.stock.efficiencyTrend} />
-              <ScoreComponent label="Playmaking Trend" value={player.stock.playmakingTrend} />
+              <ScoreComponent label="Player Quality" value={player.stock.qualityScore} signed={false} />
+              <ScoreComponent label="Recent Trend" value={player.stock.trendScore} />
+              <ScoreComponent label="Role Score" value={player.stock.roleScore} signed={false} />
               <ScoreComponent label="Team Success" value={player.stock.teamSuccess} />
             </CardContent>
           </Card>
@@ -191,14 +191,22 @@ export default async function PlayerPage({ params }: PlayerPageProps) {
   );
 }
 
-function ScoreComponent({ label, value }: { label: string; value: number }) {
+function ScoreComponent({
+  label,
+  value,
+  signed = true,
+}: {
+  label: string;
+  value: number;
+  signed?: boolean;
+}) {
   const positive = value >= 0;
 
   return (
     <div className="rounded-2xl border border-border/70 bg-secondary/25 p-4">
       <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">{label}</p>
       <p className={positive ? "mt-2 font-mono text-2xl text-gain" : "mt-2 font-mono text-2xl text-loss"}>
-        {formatSigned(value)}
+        {signed ? formatSigned(value) : value.toFixed(1)}
       </p>
     </div>
   );
