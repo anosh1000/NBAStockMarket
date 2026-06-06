@@ -1,5 +1,5 @@
 import OpenAI from "openai";
-import type { PlayerMarket } from "@/lib/mock-data";
+import type { PlayerMarket, ScoutReportSections } from "@/lib/mock-data";
 
 export type GeneratedScoutReport = {
   report: string;
@@ -38,27 +38,54 @@ Current stock score: ${player.stock.score}
 Last 10 games: ${player.last10Stats.ppg} PPG, ${player.last10Stats.rpg} RPG, ${player.last10Stats.apg} APG, ${player.last10Stats.tsPct} TS%
 Season average: ${player.seasonStats.ppg} PPG, ${player.seasonStats.rpg} RPG, ${player.seasonStats.apg} APG, ${player.seasonStats.tsPct} TS%
 
-Return sections:
-1. Summary
-2. Why Stock Is Rising/Falling
-3. Strengths
-4. Concerns
-5. Outlook
+Return ONLY valid JSON. Do not include markdown, numbering, labels inside values, or text outside JSON.
+Use this exact shape:
+{
+  "summary": "1-2 sentences.",
+  "movement": "2-3 sentences explaining why the stock is rising or falling.",
+  "strengths": ["short strength 1", "short strength 2", "short strength 3"],
+  "concerns": ["short concern 1", "short concern 2"],
+  "outlook": "1-2 sentences."
+}
 `.trim();
+}
+
+function serializeReport(report: ScoutReportSections) {
+  return JSON.stringify(report);
 }
 
 function buildFallbackReport(player: PlayerMarket): GeneratedScoutReport {
   return {
-    report: [
-      player.report.summary,
-      player.report.movement,
-      `Strengths: ${player.report.strengths.join("; ")}`,
-      `Concerns: ${player.report.concerns.join("; ")}`,
-      `Outlook: ${player.report.outlook}`,
-    ].join("\n\n"),
+    report: serializeReport(player.report),
     generatedAt: new Date(),
     stockScoreAtGeneration: player.stock.score,
   };
+}
+
+function parseJsonReport(value: string): ScoutReportSections | null {
+  try {
+    const parsed = JSON.parse(value) as Partial<ScoutReportSections>;
+
+    if (
+      typeof parsed.summary !== "string" ||
+      typeof parsed.movement !== "string" ||
+      !Array.isArray(parsed.strengths) ||
+      !Array.isArray(parsed.concerns) ||
+      typeof parsed.outlook !== "string"
+    ) {
+      return null;
+    }
+
+    return {
+      summary: parsed.summary,
+      movement: parsed.movement,
+      strengths: parsed.strengths.filter((item): item is string => typeof item === "string"),
+      concerns: parsed.concerns.filter((item): item is string => typeof item === "string"),
+      outlook: parsed.outlook,
+    };
+  } catch {
+    return null;
+  }
 }
 
 export async function generateScoutReport(player: PlayerMarket): Promise<GeneratedScoutReport> {
@@ -72,9 +99,10 @@ export async function generateScoutReport(player: PlayerMarket): Promise<Generat
       model: "gpt-4.1-mini",
       input: buildScoutReportPrompt(player),
     });
+    const parsedReport = parseJsonReport(response.output_text);
 
     return {
-      report: response.output_text,
+      report: serializeReport(parsedReport ?? player.report),
       generatedAt: new Date(),
       stockScoreAtGeneration: player.stock.score,
     };

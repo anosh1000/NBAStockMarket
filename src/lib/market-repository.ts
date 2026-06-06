@@ -35,17 +35,147 @@ async function fetchDbMarketPlayers() {
 
 type DbMarketPlayer = Awaited<ReturnType<typeof fetchDbMarketPlayers>>[number];
 
-function parseList(value: string | undefined) {
+type SectionKey = "summary" | "movement" | "strengths" | "concerns" | "outlook";
+
+function cleanReportText(value: string | undefined) {
   if (!value) {
-    return [];
+    return "";
   }
 
   return value
-    .replace(/^Strengths:\s*/i, "")
-    .replace(/^Concerns:\s*/i, "")
-    .split(";")
+    .replace(/\*\*/g, "")
+    .replace(/^#{1,6}\s*/gm, "")
+    .replace(/^[-*]\s+/gm, "")
+    .replace(/\r\n/g, "\n")
+    .trim();
+}
+
+function stripSectionLabel(value: string, label: string) {
+  return cleanReportText(value)
+    .replace(new RegExp(`^\\s*(?:\\d+\\.\\s*)?${label}\\s*:?\\s*`, "i"), "")
+    .trim();
+}
+
+function parseList(value: string | undefined, label: string) {
+  const cleaned = stripSectionLabel(value ?? "", label);
+
+  if (!cleaned) {
+    return [];
+  }
+
+  return cleaned
+    .split(/\n|;|•/)
     .map((item) => item.trim())
+    .map((item) => item.replace(/^[-*]\s*/, "").replace(/^\d+[.)]\s*/, "").trim())
     .filter(Boolean);
+}
+
+function parseJsonReport(reportText: string): ScoutReportSections | null {
+  try {
+    const parsed = JSON.parse(reportText) as Partial<ScoutReportSections>;
+
+    if (
+      typeof parsed.summary !== "string" ||
+      typeof parsed.movement !== "string" ||
+      !Array.isArray(parsed.strengths) ||
+      !Array.isArray(parsed.concerns) ||
+      typeof parsed.outlook !== "string"
+    ) {
+      return null;
+    }
+
+    return {
+      summary: stripSectionLabel(parsed.summary, "Summary"),
+      movement: stripSectionLabel(parsed.movement, "Why Stock Is Rising/Falling"),
+      strengths: parsed.strengths
+        .filter((item): item is string => typeof item === "string")
+        .map((item) => cleanReportText(item))
+        .filter(Boolean),
+      concerns: parsed.concerns
+        .filter((item): item is string => typeof item === "string")
+        .map((item) => cleanReportText(item))
+        .filter(Boolean),
+      outlook: stripSectionLabel(parsed.outlook, "Outlook"),
+    };
+  } catch {
+    return null;
+  }
+}
+
+function normalizeHeading(value: string): SectionKey | null {
+  const normalized = cleanReportText(value)
+    .replace(/^\d+[.)]\s*/, "")
+    .replace(/:$/, "")
+    .toLowerCase();
+
+  if (normalized === "summary") {
+    return "summary";
+  }
+
+  if (
+    normalized === "why stock is rising/falling" ||
+    normalized === "why stock is rising" ||
+    normalized === "why stock is falling" ||
+    normalized === "movement"
+  ) {
+    return "movement";
+  }
+
+  if (normalized === "strengths") {
+    return "strengths";
+  }
+
+  if (normalized === "concerns") {
+    return "concerns";
+  }
+
+  if (normalized === "outlook") {
+    return "outlook";
+  }
+
+  return null;
+}
+
+function parseMarkdownReport(reportText: string) {
+  const sections: Partial<Record<SectionKey, string[]>> = {};
+  let currentSection: SectionKey | null = null;
+
+  cleanReportText(reportText)
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .forEach((line) => {
+      const headingOnly = normalizeHeading(line);
+      const inlineHeading = line.match(
+        /^(?:\d+[.)]\s*)?(Summary|Why Stock Is Rising\/Falling|Strengths|Concerns|Outlook)\s*:\s*(.+)$/i,
+      );
+
+      if (headingOnly) {
+        currentSection = headingOnly;
+        sections[currentSection] = sections[currentSection] ?? [];
+        return;
+      }
+
+      if (inlineHeading) {
+        currentSection = normalizeHeading(inlineHeading[1]);
+        if (currentSection) {
+          sections[currentSection] = sections[currentSection] ?? [];
+          sections[currentSection]?.push(inlineHeading[2]);
+        }
+        return;
+      }
+
+      if (!currentSection && line.startsWith("{")) {
+        return;
+      }
+
+      if (currentSection) {
+        sections[currentSection] = sections[currentSection] ?? [];
+        sections[currentSection]?.push(line);
+      }
+    });
+
+  return sections;
 }
 
 function parseScoutReport(
@@ -69,21 +199,31 @@ function parseScoutReport(
     };
   }
 
+  const jsonReport = parseJsonReport(reportText);
+
+  if (jsonReport) {
+    return jsonReport;
+  }
+
+  const sections = parseMarkdownReport(reportText);
   const paragraphs = reportText
     .split(/\n{2,}/)
     .map((paragraph) => paragraph.trim())
     .filter(Boolean);
 
   return {
-    summary: paragraphs[0] ?? reportText,
-    movement: paragraphs[1] ?? paragraphs[0] ?? reportText,
-    strengths: parseList(paragraphs.find((paragraph) => /^Strengths:/i.test(paragraph))),
-    concerns: parseList(paragraphs.find((paragraph) => /^Concerns:/i.test(paragraph))),
+    summary:
+      stripSectionLabel(sections.summary?.join(" ") ?? paragraphs[0] ?? reportText, "Summary") ||
+      reportText,
+    movement:
+      stripSectionLabel(
+        sections.movement?.join(" ") ?? paragraphs[1] ?? paragraphs[0] ?? reportText,
+        "Why Stock Is Rising/Falling",
+      ) || reportText,
+    strengths: parseList(sections.strengths?.join("\n"), "Strengths"),
+    concerns: parseList(sections.concerns?.join("\n"), "Concerns"),
     outlook:
-      paragraphs
-        .find((paragraph) => /^Outlook:/i.test(paragraph))
-        ?.replace(/^Outlook:\s*/i, "") ??
-      paragraphs.at(-1) ??
+      stripSectionLabel(sections.outlook?.join(" ") ?? paragraphs.at(-1) ?? reportText, "Outlook") ||
       "Monitor the next daily refresh for updated trend confirmation.",
   };
 }

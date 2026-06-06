@@ -16,7 +16,7 @@ export function ScoutReportCard({ report }: ScoutReportCardProps) {
           </div>
           <div>
             <CardTitle>AI Scout Report</CardTitle>
-            <CardDescription>Seeded report shaped for future OpenAI generation.</CardDescription>
+            <CardDescription>Generated from current stock data and recent NBA game logs.</CardDescription>
           </div>
         </div>
       </CardHeader>
@@ -49,7 +49,7 @@ function ReportList({ title, items }: { title: string; items: string[] }) {
         {title}
       </h3>
       <ul className="grid gap-2 text-muted-foreground">
-        {items.map((item) => (
+        {(items.length ? items : ["No items were extracted for this section."]).map((item) => (
           <li key={item} className="rounded-lg border border-border/70 bg-secondary/25 p-3">
             {item}
           </li>
