@@ -43,6 +43,12 @@ export default async function HomePage() {
                   <ArrowRight className="h-4 w-4" />
                 </Link>
               </Button>
+              <Button asChild size="lg" variant="secondary">
+                <Link href="#player-search">
+                  Search Players
+                  <Search className="h-4 w-4" />
+                </Link>
+              </Button>
               <Button asChild size="lg" variant="outline">
                 <Link href="#leaderboards">
                   Scroll to Market
@@ -54,7 +60,7 @@ export default async function HomePage() {
               href="#leaderboards"
               className="inline-flex items-center gap-2 pt-2 font-mono text-xs uppercase tracking-[0.22em] text-muted-foreground transition hover:text-primary"
             >
-              Scroll down for risers, fallers, search, and trending players
+              Jump to risers, fallers, player search, and trending players
               <ArrowDown className="h-4 w-4 animate-bounce" />
             </a>
           </div>
@@ -134,7 +140,7 @@ export default async function HomePage() {
         </section>
       ) : null}
 
-      <section className="grid gap-6 lg:grid-cols-[0.9fr_1.1fr]">
+      <section id="player-search" className="scroll-mt-24 grid gap-6 lg:grid-cols-[0.9fr_1.1fr]">
         <div className="space-y-3">
           <p className="font-mono text-xs uppercase tracking-[0.22em] text-primary">
             Search Terminal

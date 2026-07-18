@@ -7,7 +7,6 @@ import { ArrowLeft, Eye, Trophy } from "lucide-react";
 import { ComparisonChart } from "@/components/comparison-chart";
 import { ScoutReportCard } from "@/components/scout-report-card";
 import { StockScoreBadge } from "@/components/stock-score-badge";
-import { StockTrendChart } from "@/components/stock-trend-chart";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { getMarketPlayer } from "@/lib/market-repository";
@@ -83,6 +82,8 @@ export default async function PlayerPage({ params }: PlayerPageProps) {
         </Card>
 
         <div className="grid gap-6">
+          <ScoutReportCard report={player.report} />
+
           <Card>
             <CardHeader>
               <CardTitle>Current Stock Score</CardTitle>
@@ -113,17 +114,7 @@ export default async function PlayerPage({ params }: PlayerPageProps) {
         </div>
       </section>
 
-      <section className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
-        <Card>
-          <CardHeader>
-            <CardTitle>Stock Trend Chart</CardTitle>
-            <CardDescription>Last 30 days, last 90 days, or full stored season.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <StockTrendChart history={player.stockHistory} />
-          </CardContent>
-        </Card>
-
+      <section>
         <Card>
           <CardHeader>
             <CardTitle>Season vs Last 10</CardTitle>
@@ -185,8 +176,6 @@ export default async function PlayerPage({ params }: PlayerPageProps) {
           </CardContent>
         </Card>
       </section>
-
-      <ScoutReportCard report={player.report} />
     </div>
   );
 }
